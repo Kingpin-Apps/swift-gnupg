@@ -1,26 +1,43 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
     name: "swift-gnupg",
+    platforms: [
+        .macOS(.v10_15),
+        .iOS(.v13),
+        .tvOS(.v13),
+        .watchOS(.v6)
+    ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "swift-gnupg",
-            targets: ["swift-gnupg"]
+            name: "GnuPG",
+            targets: ["GnuPG"]
         ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
+        .package(url: "https://github.com/apple/swift-system.git", from: "1.6.3"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "swift-gnupg"
+            name: "GnuPG",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "SystemPackage", package: "swift-system"),
+            ]
         ),
         .testTarget(
-            name: "swift-gnupgTests",
-            dependencies: ["swift-gnupg"]
+            name: "GnuPGTests",
+            dependencies: ["GnuPG"],
+            resources: [
+                .copy("data")
+            ]
         ),
     ]
 )
