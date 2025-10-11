@@ -46,11 +46,10 @@ if let version = gpg.version {
     print("Using GPG version \(version.major).\(version.minor)")
 }
 ```
-
-### Custom Configuration
+### Advanced Configuration
 
 ```swift
-// Advanced configuration
+// Custom GPG configuration
 let customGPG = try GnuPG(
     gpgBinary: "/usr/local/bin/gpg",
     gnupgHome: "~/.gnupg-custom",
@@ -60,6 +59,50 @@ let customGPG = try GnuPG(
 
 // Enable detailed logging
 customGPG.logger.level = .debug
+```
+
+### Using Extra Arguments
+
+You can pass additional GPG command-line arguments to any operation using the `extraArgs` parameter:
+
+```swift
+func advancedEncryption() async {
+    do {
+        let gpg = try GnuPG()
+        
+        // Use specific cipher and compression algorithms
+        let encryptResult = await gpg.encrypt(
+            message: "Top secret data",
+            recipients: ["user@example.com"],
+            armor: true,
+            extraArgs: [
+                "--cipher-algo", "AES256",
+                "--digest-algo", "SHA512", 
+                "--compress-algo", "2",
+                "--compression-level", "9"
+            ]
+        )
+        
+        if encryptResult.isSuccessful {
+            print("✅ Encrypted with AES256 and maximum compression")
+        }
+        
+        // Custom signing with extra security
+        let signResult = await gpg.sign(
+            message: "Important document",
+            keyId: "signing-key@company.com",
+            extraArgs: [
+                "--digest-algo", "SHA512",
+                "--cert-digest-algo", "SHA512",
+                "--s2k-digest-algo", "SHA512"
+            ]
+        )
+        
+    } catch {
+        print("Error: \(error)")
+    }
+}
+```
 customGPG.logger.setConsoleLogging(enabled: true)
 ```
 

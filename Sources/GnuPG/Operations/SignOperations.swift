@@ -12,6 +12,7 @@ extension GnuPG {
     ///   - clearsign: Whether to create a clear signature (default: false)
     ///   - detach: Whether to create a detached signature (default: true)
     ///   - binary: Whether to create a binary signature (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A SignResult indicating success or failure
     @discardableResult
     public func sign(message: String,
@@ -19,7 +20,8 @@ extension GnuPG {
                     passphrase: String? = nil,
                     clearsign: Bool = false,
                     detach: Bool = true,
-                    binary: Bool = false) async -> SignResult {
+                    binary: Bool = false,
+                    extraArgs: [String]? = nil) async -> SignResult {
         
         let result = SignResult(gpg: self)
         
@@ -43,6 +45,11 @@ extension GnuPG {
             // Add key ID if specified
             if let keyId = keyId {
                 args.append(contentsOf: ["--local-user", keyId])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             let process = try await self.executeCommand(
@@ -72,6 +79,7 @@ extension GnuPG {
     ///   - clearsign: Whether to create a clear signature (default: false)
     ///   - detach: Whether to create a detached signature (default: true)
     ///   - binary: Whether to create a binary signature (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A SignResult indicating success or failure
     @discardableResult
     public func sign(data: Data,
@@ -79,7 +87,8 @@ extension GnuPG {
                     passphrase: String? = nil,
                     clearsign: Bool = false,
                     detach: Bool = true,
-                    binary: Bool = false) async -> SignResult {
+                    binary: Bool = false,
+                    extraArgs: [String]? = nil) async -> SignResult {
         
         let result = SignResult(gpg: self)
         
@@ -103,6 +112,11 @@ extension GnuPG {
             // Add key ID if specified
             if let keyId = keyId {
                 args.append(contentsOf: ["--local-user", keyId])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             let process = try await self.executeCommand(
@@ -133,6 +147,7 @@ extension GnuPG {
     ///   - clearsign: Whether to create a clear signature (default: false)
     ///   - detach: Whether to create a detached signature (default: true)
     ///   - binary: Whether to create a binary signature (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A SignResult indicating success or failure
     @discardableResult
     public func signFile(inputPath: String,
@@ -141,7 +156,8 @@ extension GnuPG {
                         passphrase: String? = nil,
                         clearsign: Bool = false,
                         detach: Bool = true,
-                        binary: Bool = false) async -> SignResult {
+                        binary: Bool = false,
+                        extraArgs: [String]? = nil) async -> SignResult {
         
         let result = SignResult(gpg: self)
         
@@ -176,6 +192,11 @@ extension GnuPG {
             // Add output file if specified
             if let outputPath = outputPath {
                 args.append(contentsOf: ["--output", outputPath])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             // Add input file

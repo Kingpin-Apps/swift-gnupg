@@ -12,6 +12,7 @@ extension GnuPG {
     ///   - passphrase: Optional passphrase for signing key
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - alwaysTrust: Whether to trust recipient keys without verification (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encrypt(message: String,
@@ -19,7 +20,8 @@ extension GnuPG {
                        signKeyId: String? = nil,
                        passphrase: String? = nil,
                        armor: Bool = true,
-                       alwaysTrust: Bool = false) async -> EncryptResult {
+                       alwaysTrust: Bool = false,
+                       extraArgs: [String]? = nil) async -> EncryptResult {
         
         guard let messageData = message.data(using: .utf8) else {
             let result = EncryptResult(gpg: self)
@@ -32,7 +34,8 @@ extension GnuPG {
                            signKeyId: signKeyId,
                            passphrase: passphrase,
                            armor: armor,
-                           alwaysTrust: alwaysTrust)
+                           alwaysTrust: alwaysTrust,
+                           extraArgs: extraArgs)
     }
     
     /// Encrypt data using public key encryption
@@ -43,6 +46,7 @@ extension GnuPG {
     ///   - passphrase: Optional passphrase for signing key
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - alwaysTrust: Whether to trust recipient keys without verification (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encrypt(data: Data,
@@ -50,7 +54,8 @@ extension GnuPG {
                        signKeyId: String? = nil,
                        passphrase: String? = nil,
                        armor: Bool = true,
-                       alwaysTrust: Bool = false) async -> EncryptResult {
+                       alwaysTrust: Bool = false,
+                       extraArgs: [String]? = nil) async -> EncryptResult {
         
         let result = EncryptResult(gpg: self)
         
@@ -86,6 +91,11 @@ extension GnuPG {
                 args.append(contentsOf: ["--recipient", recipient])
             }
             
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
+            }
+            
             let processResult = try await self.executeCommand(
                 arguments: args,
                 input: data,
@@ -109,12 +119,14 @@ extension GnuPG {
     ///   - passphrase: The passphrase to use for encryption
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - cipher: Optional cipher algorithm to use
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encryptSymmetric(message: String,
                                passphrase: String,
                                armor: Bool = true,
-                               cipher: String? = nil) async -> EncryptResult {
+                               cipher: String? = nil,
+                               extraArgs: [String]? = nil) async -> EncryptResult {
         
         guard let messageData = message.data(using: .utf8) else {
             let result = EncryptResult(gpg: self)
@@ -125,7 +137,8 @@ extension GnuPG {
         return await encryptSymmetric(data: messageData,
                                     passphrase: passphrase,
                                     armor: armor,
-                                    cipher: cipher)
+                                    cipher: cipher,
+                                    extraArgs: extraArgs)
     }
     
     /// Encrypt data using symmetric encryption (passphrase-based)
@@ -134,12 +147,14 @@ extension GnuPG {
     ///   - passphrase: The passphrase to use for encryption
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - cipher: Optional cipher algorithm to use
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encryptSymmetric(data: Data,
                                passphrase: String,
                                armor: Bool = true,
-                               cipher: String? = nil) async -> EncryptResult {
+                               cipher: String? = nil,
+                               extraArgs: [String]? = nil) async -> EncryptResult {
         
         let result = EncryptResult(gpg: self)
         
@@ -154,6 +169,11 @@ extension GnuPG {
             // Add cipher algorithm if specified
             if let cipherAlg = cipher {
                 args.append(contentsOf: ["--cipher-algo", cipherAlg])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             let processResult = try await self.executeCommand(
@@ -182,6 +202,7 @@ extension GnuPG {
     ///   - passphrase: Optional passphrase for signing key
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - alwaysTrust: Whether to trust recipient keys without verification (default: false)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encryptFile(inputPath: String,
@@ -190,7 +211,8 @@ extension GnuPG {
                            signKeyId: String? = nil,
                            passphrase: String? = nil,
                            armor: Bool = true,
-                           alwaysTrust: Bool = false) async -> EncryptResult {
+                           alwaysTrust: Bool = false,
+                           extraArgs: [String]? = nil) async -> EncryptResult {
         
         let result = EncryptResult(gpg: self)
         
@@ -235,6 +257,11 @@ extension GnuPG {
             // Add recipients
             for recipient in recipients {
                 args.append(contentsOf: ["--recipient", recipient])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             // Add input file
@@ -266,13 +293,15 @@ extension GnuPG {
     ///   - passphrase: The passphrase to use for encryption
     ///   - armor: Whether to create ASCII armored output (default: true)
     ///   - cipher: Optional cipher algorithm to use
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: An EncryptResult indicating success or failure
     @discardableResult
     public func encryptFileSymmetric(inputPath: String,
                                    outputPath: String? = nil,
                                    passphrase: String,
                                    armor: Bool = true,
-                                   cipher: String? = nil) async -> EncryptResult {
+                                   cipher: String? = nil,
+                                   extraArgs: [String]? = nil) async -> EncryptResult {
         
         let result = EncryptResult(gpg: self)
         
@@ -298,6 +327,11 @@ extension GnuPG {
             // Add output file if specified
             if let outputPath = outputPath {
                 args.append(contentsOf: ["--output", outputPath])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             // Add input file

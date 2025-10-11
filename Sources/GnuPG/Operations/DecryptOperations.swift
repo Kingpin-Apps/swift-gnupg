@@ -8,10 +8,12 @@ extension GnuPG {
     /// - Parameters:
     ///   - message: The encrypted data as a String
     ///   - passphrase: Optional passphrase for decryption (required for encrypted messages)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult with the decrypted data and status information
     @discardableResult
     public func decrypt(message: String,
-                       passphrase: String? = nil) async -> DecryptResult {
+                       passphrase: String? = nil,
+                       extraArgs: [String]? = nil) async -> DecryptResult {
         
         guard let messageData = message.data(using: .utf8) else {
             let result = DecryptResult(gpg: self)
@@ -19,22 +21,29 @@ extension GnuPG {
             return result
         }
         
-        return await decrypt(data: messageData, passphrase: passphrase)
+        return await decrypt(data: messageData, passphrase: passphrase, extraArgs: extraArgs)
     }
     
     /// Decrypt encrypted data
     /// - Parameters:
     ///   - data: The encrypted data
     ///   - passphrase: Optional passphrase for decryption (required for encrypted messages)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult with the decrypted data and status information
     @discardableResult
     public func decrypt(data: Data,
-                       passphrase: String? = nil) async -> DecryptResult {
+                       passphrase: String? = nil,
+                       extraArgs: [String]? = nil) async -> DecryptResult {
         
         let result = DecryptResult(gpg: self)
         
         do {
-            let args = ["--decrypt"]
+            var args = ["--decrypt"]
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
+            }
             
             let processResult = try await self.executeCommand(
                 arguments: args,
@@ -63,11 +72,13 @@ extension GnuPG {
     ///   - inputPath: Path to the encrypted file
     ///   - outputPath: Optional path for the decrypted output (if nil, removes .gpg/.asc extension)
     ///   - passphrase: Optional passphrase for decryption
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult indicating success or failure
     @discardableResult
     public func decryptFile(inputPath: String,
                            outputPath: String? = nil,
-                           passphrase: String? = nil) async -> DecryptResult {
+                           passphrase: String? = nil,
+                           extraArgs: [String]? = nil) async -> DecryptResult {
         
         let result = DecryptResult(gpg: self)
         
@@ -83,6 +94,11 @@ extension GnuPG {
             // Add output file if specified
             if let outputPath = outputPath {
                 args.append(contentsOf: ["--output", outputPath])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             // Add input file
@@ -115,10 +131,12 @@ extension GnuPG {
     /// - Parameters:
     ///   - message: The encrypted and signed message
     ///   - passphrase: Optional passphrase for decryption
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult with both decryption and signature verification information
     @discardableResult
     public func decryptAndVerify(message: String,
-                               passphrase: String? = nil) async -> DecryptResult {
+                               passphrase: String? = nil,
+                               extraArgs: [String]? = nil) async -> DecryptResult {
         
         guard let messageData = message.data(using: .utf8) else {
             let result = DecryptResult(gpg: self)
@@ -126,23 +144,30 @@ extension GnuPG {
             return result
         }
         
-        return await decryptAndVerify(data: messageData, passphrase: passphrase)
+        return await decryptAndVerify(data: messageData, passphrase: passphrase, extraArgs: extraArgs)
     }
     
     /// Decrypt and verify data in one operation
     /// - Parameters:
     ///   - data: The encrypted and signed data
     ///   - passphrase: Optional passphrase for decryption
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult with both decryption and signature verification information
     @discardableResult
     public func decryptAndVerify(data: Data,
-                               passphrase: String? = nil) async -> DecryptResult {
+                               passphrase: String? = nil,
+                               extraArgs: [String]? = nil) async -> DecryptResult {
         
         let result = DecryptResult(gpg: self)
         
         do {
             // Use --decrypt which also verifies signatures if present
-            let args = ["--decrypt"]
+            var args = ["--decrypt"]
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
+            }
             
             let processResult = try await self.executeCommand(
                 arguments: args,
@@ -171,11 +196,13 @@ extension GnuPG {
     ///   - inputPath: Path to the encrypted and signed file
     ///   - outputPath: Optional path for the decrypted output
     ///   - passphrase: Optional passphrase for decryption
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A DecryptResult with both decryption and signature verification information
     @discardableResult
     public func decryptAndVerifyFile(inputPath: String,
                                    outputPath: String? = nil,
-                                   passphrase: String? = nil) async -> DecryptResult {
+                                   passphrase: String? = nil,
+                                   extraArgs: [String]? = nil) async -> DecryptResult {
         
         let result = DecryptResult(gpg: self)
         
@@ -191,6 +218,11 @@ extension GnuPG {
             // Add output file if specified
             if let outputPath = outputPath {
                 args.append(contentsOf: ["--output", outputPath])
+            }
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
             }
             
             // Add input file

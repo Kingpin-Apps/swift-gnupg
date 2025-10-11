@@ -11,13 +11,15 @@ extension GnuPG {
     ///   - keys: Optional array of specific key IDs to list (alternative to pattern)
     ///   - sigs: Whether to list signatures (default: false)
     ///   - secret: Alternative parameter for secretKeys (for compatibility)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A ListKeysResult containing the found keys
     @discardableResult
     public func listKeys(pattern: String? = nil,
                         secretKeys: Bool = false,
                         keys: [String]? = nil,
                         sigs: Bool = false,
-                        secret: Bool? = nil) async -> ListKeysResult {
+                        secret: Bool? = nil,
+                        extraArgs: [String]? = nil) async -> ListKeysResult {
         
         let result = ListKeysResult(gpg: self)
         
@@ -33,6 +35,11 @@ extension GnuPG {
             }
             
             args.append(contentsOf: ["--with-colons", "--with-fingerprint"])
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
+            }
             
             // Add specific keys if provided
             if let keyList = keys {

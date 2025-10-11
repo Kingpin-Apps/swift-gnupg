@@ -39,7 +39,7 @@ public final class GnuPG: @unchecked Sendable {
     public let environment: [String: String]?
     
     /// The encoding to use for GPG communication (defaults to latin-1 like python-gnupg)
-    public let encoding: String.Encoding = .isoLatin1
+    public var encoding: String.Encoding = .isoLatin1
     
     /// Buffer size for data operations
     public var bufferSize: Int = 16384

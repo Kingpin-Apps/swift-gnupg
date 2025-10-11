@@ -8,29 +8,36 @@ extension GnuPG {
     /// - Parameters:
     ///   - message: The signed data as a String
     ///   - signature: Optional detached signature data (if nil, expects inline signature)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A VerifyResult indicating verification status
     @discardableResult
-    public func verify(message: String, signature: Data? = nil) async -> VerifyResult {
+    public func verify(message: String, signature: Data? = nil, extraArgs: [String]? = nil) async -> VerifyResult {
         guard let messageData = message.data(using: .utf8) else {
             let result = VerifyResult(gpg: self)
             result.status = "error: failed to convert message to data"
             return result
         }
         
-        return await verify(data: messageData, signature: signature)
+        return await verify(data: messageData, signature: signature, extraArgs: extraArgs)
     }
     
     /// Verify a signature on data
     /// - Parameters:
     ///   - data: The signed data
     ///   - signature: Optional detached signature data (if nil, expects inline signature)
+    ///   - extraArgs: Additional GPG command-line arguments (default: nil)
     /// - Returns: A VerifyResult indicating verification status
     @discardableResult
-    public func verify(data: Data, signature: Data? = nil) async -> VerifyResult {
+    public func verify(data: Data, signature: Data? = nil, extraArgs: [String]? = nil) async -> VerifyResult {
         let result = VerifyResult(gpg: self)
         
         do {
             var args = ["--verify"]
+            
+            // Add extra arguments if provided
+            if let extraArgs = extraArgs {
+                args.append(contentsOf: extraArgs)
+            }
             
             if let sigData = signature {
                 // Detached signature verification
