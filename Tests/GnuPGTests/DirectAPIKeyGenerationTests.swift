@@ -3,7 +3,7 @@ import Testing
 @testable import GnuPG
 
 /// Tests for key generation functionality
-@Suite("Direct API Key Generation Tests")
+@Suite("Direct API Key Generation Tests", .serialized)
 struct DirectAPIKeyGenerationTests {
     
     /// Test basic key generation

@@ -7,7 +7,7 @@ import Foundation
 /// Corresponds to Python tests:
 /// - test_get_recipients, test_passing_paths, test_search_keys, test_invalid_fileobject,
 /// - test_auto_key_locating, test_passphrase_encoding, test_configured_group, test_exception_propagation
-@Suite("Advanced/Edge Case Tests")
+@Suite("Advanced/Edge Case Tests", .serialized)
 struct AdvancedTests {
     
     // MARK: - Recipient Analysis Tests

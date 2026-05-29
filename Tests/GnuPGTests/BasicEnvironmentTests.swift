@@ -6,7 +6,7 @@ import Foundation
 /// 
 /// Corresponds to Python tests: 
 /// - test_environment, test_list_keys_initial, test_nogpg, test_invalid_home, test_make_args
-@Suite("Basic Environment Tests")
+@Suite("Basic Environment Tests", .serialized)
 struct BasicEnvironmentTests {
     
     // MARK: - Environment Tests

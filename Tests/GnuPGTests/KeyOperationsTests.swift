@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import GnuPG
 
-@Suite("Key Operations Tests")
+@Suite("Key Operations Tests", .serialized)
 struct KeyOperationsTests {
     
     // MARK: - Test Setup

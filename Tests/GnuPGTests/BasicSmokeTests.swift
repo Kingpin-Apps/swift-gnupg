@@ -3,7 +3,7 @@ import Testing
 @testable import GnuPG
 
 /// Basic smoke tests that don't require GPG agent or key generation
-@Suite("Basic Smoke Tests")
+@Suite("Basic Smoke Tests", .serialized)
 struct BasicSmokeTests {
     
     @Test("GPG binary initialization")

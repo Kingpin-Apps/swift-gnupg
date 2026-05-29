@@ -3,7 +3,7 @@ import SystemPackage
 import Foundation
 @testable import GnuPG
 
-@Suite("Encrypt/Decrypt Operations Tests")
+@Suite("Encrypt/Decrypt Operations Tests", .serialized)
 struct EncryptDecryptTests {
     
     // MARK: - Test Setup
@@ -470,7 +470,7 @@ struct EncryptDecryptTests {
 /// Corresponds to Python tests:
 /// - test_encryption_and_decryption, test_file_encryption_and_decryption,
 /// - test_invalid_outputs, test_filenames_with_spaces, test_no_such_key
-@Suite("Ported Encryption/Decryption Tests")
+@Suite("Ported Encryption/Decryption Tests", .serialized)
 struct PortedEncryptDecryptTests {
     
     // MARK: - Basic Encryption/Decryption

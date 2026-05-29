@@ -7,7 +7,7 @@ import Foundation
 /// Corresponds to Python tests:
 /// - test_signature_verification, test_signature_file, test_subkey_signature_file,
 /// - test_multiple_signatures, test_multiple_signatures_one_invalid
-@Suite("Signature/Verification Tests")
+@Suite("Signature/Verification Tests", .serialized)
 struct SignatureTests {
     
     // MARK: - Basic Signature Tests

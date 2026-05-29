@@ -9,7 +9,7 @@ import Foundation
 /// - test_key_generation_with_escapes, test_key_generation_failure, test_key_generation_input,
 /// - test_add_subkey, test_add_subkey_with_invalid_key_type, test_deletion_subkey,
 /// - test_list_subkey_after_generation, test_list_keys_after_generation
-@Suite("Key Generation Tests")
+@Suite("Key Generation Tests", .serialized)
 struct KeyGenerationTests {
     
     // MARK: - Basic Key Generation

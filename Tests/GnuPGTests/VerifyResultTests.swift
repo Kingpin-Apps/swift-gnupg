@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import GnuPG
 
-@Suite("VerifyResult Tests")
+@Suite("VerifyResult Tests", .serialized)
 struct VerifyResultTests {
     
     // MARK: - Mock GPG for testing

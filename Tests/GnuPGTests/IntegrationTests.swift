@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import GnuPG
 
-@Suite("Integration Tests")
+@Suite("Integration Tests", .serialized)
 struct IntegrationTests {
     
     // MARK: - Test Setup
