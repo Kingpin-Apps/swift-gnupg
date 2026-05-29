@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-gnupg",
+    name: "GnuPG",
     platforms: [
         .macOS(.v10_15),
         .iOS(.v13),
