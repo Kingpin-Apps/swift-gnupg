@@ -128,9 +128,12 @@ tO8f06R3yfjxLRD8y89frVP3+tGMvt2yGOd5TT0zht5yYcG6QkiHlfdgXqeE8nsU
     /// Create a temporary GPG home directory for isolated testing
     /// - Returns: Path to temporary directory
     static func createTempGPGHome() throws -> String {
-        let tempDir = NSTemporaryDirectory()
-        let gpgHome = tempDir + "gpg-test-\(UUID().uuidString)"
-        
+        // Base the temp home on a short path (e.g. /tmp/gpg-test-<uuid>) rather
+        // than NSTemporaryDirectory(). On macOS the latter is a ~94-char
+        // /var/folders/... path; appending /S.gpg-agent overflows the ~104-char
+        // UNIX-socket limit and gpg-agent dies with "File name too long".
+        let gpgHome = "/tmp/gpg-test-\(UUID().uuidString)"
+
         let fileManager = FileManager.default
         try fileManager.createDirectory(atPath: gpgHome, withIntermediateDirectories: true)
         
@@ -152,6 +155,9 @@ default-preference-list SHA256 SHA1 SHA384 SHA512 SHA224 AES256 AES192 AES CAST5
         try gpgConf.write(toFile: gpgConfPath, atomically: true, encoding: .utf8)
         
         // Create GPG agent configuration for testing
+        // NB: `batch` and `loopback` are gpg options, NOT gpg-agent options.
+        // Including them here makes gpg-agent refuse to start ("IPC connect
+        // call failed"), so they must stay out of gpg-agent.conf.
         let agentConf = """
 allow-loopback-pinentry
 max-cache-ttl 3600
@@ -159,8 +165,6 @@ default-cache-ttl 3600
 no-grab
 pinentry-timeout 0
 quiet
-batch
-loopback
 """
         let agentConfPath = gpgHome + "/gpg-agent.conf"
         try agentConf.write(toFile: agentConfPath, atomically: true, encoding: .utf8)
@@ -261,9 +265,80 @@ loopback
         )
         return (gpg, homeDir)
     }
-    
+
+    // MARK: - Test Doubles & Capability Gating
+
+    /// Build a `GnuPG` instance for parsing / result-construction unit tests.
+    ///
+    /// This launches no subprocess and requires no installed `gpg`, so tests that
+    /// only feed canned status messages to a result type (e.g. `VerifyResult`)
+    /// run anywhere, including headless Linux CI. Do **not** invoke real gpg
+    /// operations through the returned instance.
+    static func makeParsingStub() -> GnuPG {
+        GnuPG(unprobedBinary: "gpg")
+    }
+
+    /// Whether the current environment can perform real `gpg` crypto operations
+    /// (binary present, agent reachable, key generation succeeds).
+    ///
+    /// Integration tests gate on this via `.enabled(if:)` so they *skip* — rather
+    /// than fail — on environments without a working gpg-agent (e.g. the Swift
+    /// Package Index Linux compatibility containers). The probe runs once and the
+    /// result is cached for the lifetime of the test process.
+    static let realGPGAvailable: Bool = probeRealGPG()
+
+    private static func probeRealGPG() -> Bool {
+        do {
+            // Generate a real key in an isolated home using the same setup the
+            // integration tests use. This requires a working gpg-agent (loopback
+            // passphrase), so it returns true only where genuine secret-key crypto
+            // works and false on headless environments — letting the gpg-dependent
+            // tests skip rather than fail there.
+            //
+            // We call gpg.generateKey directly rather than the import-fallback
+            // helper: importing pre-generated *public* keys can succeed without an
+            // agent, which would be a false positive for crypto that needs secret
+            // keys (sign/decrypt/trust).
+            let (gpg, home) = try createTestGPG()
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            let result = runBlocking {
+                await gpg.generateKey(
+                    keyType: "RSA",
+                    keySize: 2048,
+                    userId: "SwiftGnuPG Probe <probe@example.com>",
+                    passphrase: "probe",
+                    expirationDate: nil
+                )
+            }
+            return result.isSuccessful
+        } catch {
+            return false
+        }
+    }
+
+    /// Runs an async operation to completion from a synchronous context.
+    /// Used only by `probeRealGPG`, which must produce a `Bool` for the
+    /// synchronous `.enabled(if:)` trait. The work runs on a detached task while
+    /// this thread blocks on a semaphore; the gpg subprocess I/O it performs is
+    /// not bound to the calling thread, so there is no deadlock.
+    private static func runBlocking<T: Sendable>(_ operation: @escaping @Sendable () async -> T) -> T {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = ResultBox<T>()
+        Task.detached {
+            box.value = await operation()
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return box.value!
+    }
+
+    private final class ResultBox<T>: @unchecked Sendable {
+        var value: T?
+    }
+
     // MARK: - Key Generation Helpers
-    
+
     /// Parameters for key generation matching Python test suite
     struct KeyGenParams {
         let keyType: String
