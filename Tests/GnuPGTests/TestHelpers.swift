@@ -302,6 +302,13 @@ quiet
         guard let home = try? createTempGPGHome() else { return false }
         defer { try? FileManager.default.removeItem(atPath: home) }
 
+        // Resolve gpg to an absolute path the same way the library does (it
+        // initializes via --list-config). `/usr/bin/env gpg` would depend on
+        // PATH, which Xcode's test runner strips of Homebrew — there the probe
+        // would fail and every gpg-gated suite would silently skip even though
+        // crypto works. An absolute gpg path also auto-starts gpg-agent.
+        guard let gpg = try? GnuPG(gnupgHome: home) else { return false }
+
         let keyParams = """
         %echo SwiftGnuPG probe
         Key-Type: RSA
@@ -314,12 +321,9 @@ quiet
         """
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["gpg", "--homedir", home, "--batch",
+        process.executableURL = URL(fileURLWithPath: gpg.gpgBinary)
+        process.arguments = ["--homedir", home, "--batch",
                              "--pinentry-mode", "loopback", "--generate-key"]
-        // Inherit the parent environment (PATH etc.) and point gpg at the
-        // isolated home; replacing the environment outright would drop PATH so
-        // `/usr/bin/env gpg` couldn't find the binary.
         var environment = ProcessInfo.processInfo.environment
         environment["GNUPGHOME"] = home
         process.environment = environment
