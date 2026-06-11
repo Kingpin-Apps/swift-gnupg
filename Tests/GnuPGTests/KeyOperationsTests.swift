@@ -277,18 +277,19 @@ struct KeyOperationsTests {
     }
     
     @Test("Export keys operation")
-    func testExportKeys() async {
-        guard let gpg = createTestGPG() else {
-            Issue.record("Failed to create GPG instance - GPG not available")
-            return
-        }
-        
+    func testExportKeys() async throws {
+        // Self-contained: import a known key into an isolated home rather than
+        // relying on whatever is in the system keyring, which is empty on a
+        // fresh CI runner (the old version exported nothing there and failed).
+        let (gpg, homeDir) = try TestHelpers.createTestGPG()
+        defer { TestHelpers.cleanupTempGPGHome(homeDir) }
+
+        _ = await gpg.importKeys(keyString: TestHelpers.keysToImport)
+
         let exportedData = await gpg.exportKeys()
-        
-        // Should return data since GPG is available and working
-        // The system has keys available so we expect non-empty data
+
         #expect(exportedData != nil)
-        #expect(!exportedData!.isEmpty)
+        #expect(!(exportedData?.isEmpty ?? true))
     }
     
     @Test("Delete key operation")
