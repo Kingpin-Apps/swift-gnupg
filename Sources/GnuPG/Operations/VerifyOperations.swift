@@ -30,15 +30,19 @@ extension GnuPG {
     @discardableResult
     public func verify(data: Data, signature: Data? = nil, extraArgs: [String]? = nil) async -> VerifyResult {
         let result = VerifyResult(gpg: self)
-        
+
         do {
-            var args = ["--verify"]
-            
+            // Force the pgp trust model so gpg actually reports signature trust
+            // (TRUST_ULTIMATE etc.). A global "--trust-model always" otherwise
+            // suppresses those status lines. "pgp" comes last, so it wins, and
+            // unlike --import-ownertrust a verify auto-creates the trustdb.
+            var args = ["--trust-model", "pgp", "--verify"]
+
             // Add extra arguments if provided
             if let extraArgs = extraArgs {
                 args.append(contentsOf: extraArgs)
             }
-            
+
             if let sigData = signature {
                 // Detached signature verification
                 // Create temporary files for signature and data
@@ -93,9 +97,10 @@ extension GnuPG {
                 result.valid = false
                 return result
             }
-            
-            var args = ["--verify"]
-            
+
+            // See note in verify(data:) — force pgp model so trust is reported.
+            var args = ["--trust-model", "pgp", "--verify"]
+
             if let sigPath = signaturePath {
                 // Detached signature verification
                 guard FileManager.default.fileExists(atPath: sigPath) else {

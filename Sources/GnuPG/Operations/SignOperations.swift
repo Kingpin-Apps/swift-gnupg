@@ -18,30 +18,30 @@ extension GnuPG {
     public func sign(message: String,
                     keyId: String? = nil,
                     passphrase: String? = nil,
-                    clearsign: Bool = false,
-                    detach: Bool = true,
+                    clearsign: Bool = true,
+                    detach: Bool = false,
                     binary: Bool = false,
                     extraArgs: [String]? = nil) async -> SignResult {
-        
+
         let result = SignResult(gpg: self)
-        
+
         do {
             var args = ["--sign"]
-            
-            // Add signature type options
-            if clearsign {
-                args[0] = "--clearsign"
-            } else if detach {
+
+            // Add signature type options. A detached signature can't be verified
+            // without the original data, so the default is an embedded signature
+            // (clearsign), matching python-gnupg.
+            if detach {
                 args[0] = "--detach-sign"
+            } else if clearsign {
+                args[0] = "--clearsign"
             }
-            
-            // Add output format options
-            if binary && !clearsign {
-                args.append("--armor")
-            } else if !binary {
+
+            // ASCII-armor unless a binary signature was requested
+            if !binary {
                 args.append("--armor")
             }
-            
+
             // Add key ID if specified
             if let keyId = keyId {
                 args.append(contentsOf: ["--local-user", keyId])
@@ -85,30 +85,30 @@ extension GnuPG {
     public func sign(data: Data,
                     keyId: String? = nil,
                     passphrase: String? = nil,
-                    clearsign: Bool = false,
-                    detach: Bool = true,
+                    clearsign: Bool = true,
+                    detach: Bool = false,
                     binary: Bool = false,
                     extraArgs: [String]? = nil) async -> SignResult {
-        
+
         let result = SignResult(gpg: self)
-        
+
         do {
             var args = ["--sign"]
-            
-            // Add signature type options
-            if clearsign {
-                args[0] = "--clearsign"
-            } else if detach {
+
+            // Add signature type options. A detached signature can't be verified
+            // without the original data, so the default is an embedded signature
+            // (clearsign), matching python-gnupg.
+            if detach {
                 args[0] = "--detach-sign"
+            } else if clearsign {
+                args[0] = "--clearsign"
             }
-            
-            // Add output format options
-            if binary && !clearsign {
-                args.append("--armor")
-            } else if !binary {
+
+            // ASCII-armor unless a binary signature was requested
+            if !binary {
                 args.append("--armor")
             }
-            
+
             // Add key ID if specified
             if let keyId = keyId {
                 args.append(contentsOf: ["--local-user", keyId])
@@ -154,70 +154,74 @@ extension GnuPG {
                         outputPath: String? = nil,
                         keyId: String? = nil,
                         passphrase: String? = nil,
-                        clearsign: Bool = false,
-                        detach: Bool = true,
+                        clearsign: Bool = true,
+                        detach: Bool = false,
                         binary: Bool = false,
                         extraArgs: [String]? = nil) async -> SignResult {
-        
+
         let result = SignResult(gpg: self)
-        
+
         do {
             // Check if input file exists
             guard FileManager.default.fileExists(atPath: inputPath) else {
                 result.status = "error: input file not found: \(inputPath)"
                 return result
             }
-            
+
             var args = ["--sign"]
-            
-            // Add signature type options
-            if clearsign {
-                args[0] = "--clearsign"
-            } else if detach {
+
+            if detach {
                 args[0] = "--detach-sign"
+            } else if clearsign {
+                args[0] = "--clearsign"
             }
-            
-            // Add output format options
-            if binary && !clearsign {
-                // Binary mode, don't add --armor
-            } else {
+
+            // ASCII-armor unless a binary signature was requested
+            if !binary {
                 args.append("--armor")
             }
-            
+
             // Add key ID if specified
             if let keyId = keyId {
                 args.append(contentsOf: ["--local-user", keyId])
             }
-            
-            // Add output file if specified
+
+            // Direct the signature to an explicit file (--yes allows overwriting)
+            // or to stdout ("-") so it is captured in `result.data`. Without an
+            // explicit --output, gpg would write a sidecar file next to the input
+            // ("input.asc"), which yields no `.data` and collides on re-signing.
             if let outputPath = outputPath {
-                args.append(contentsOf: ["--output", outputPath])
+                args.append(contentsOf: ["--yes", "--output", outputPath])
+            } else {
+                args.append(contentsOf: ["--output", "-"])
             }
-            
+
             // Add extra arguments if provided
             if let extraArgs = extraArgs {
                 args.append(contentsOf: extraArgs)
             }
-            
-            // Add input file
+
+            // Pass the file as a positional argument so gpg reads it directly from
+            // disk. Streaming a large file through stdin instead would deadlock:
+            // executeCommand writes all input before reading stdout, so once gpg's
+            // output pipe fills it stops draining stdin and both sides block.
             args.append(inputPath)
-            
-            _ = try await self.executeCommand(
+
+            let processResult = try await self.executeCommand(
                 arguments: args,
                 statusHandler: result,
                 passphrase: passphrase
             )
-            
-            // For file operations, the output is written to a file
-            // Set success if no errors occurred
-            if result.status == nil && result.fingerprint != nil {
-                result.status = "signature created"
+
+            // When no output file was requested, the signature is on stdout
+            if outputPath == nil, let output = processResult.output {
+                result.data = output
             }
-            
+
         } catch {
             result.status = "error: \(error.localizedDescription)"
         }
-        
+
         return result
     }
 }

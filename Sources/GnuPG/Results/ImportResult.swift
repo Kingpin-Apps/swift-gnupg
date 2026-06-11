@@ -19,6 +19,12 @@ public final class ImportResult: BaseStatusHandler, @unchecked Sendable {
     public var secDups = 0
     public var notImported = 0
     
+    /// Number of keys created via key generation (KEY_CREATED status lines).
+    /// Key generation reuses this result type but emits KEY_CREATED rather than
+    /// the IMPORT_OK/IMPORT_RES lines that an import produces, so the import
+    /// counters above stay zero for a freshly generated key.
+    public var generated = 0
+
     public var results: [[String: Any]] = []
     public var fingerprints: [String] = []
     public var status: String?
@@ -121,6 +127,16 @@ public final class ImportResult: BaseStatusHandler, @unchecked Sendable {
                     }
                 }
             }
+        } else if key == "KEY_CREATED" {
+            // Emitted by --generate-key. Format: "<type> [<fingerprint> [<handle>]]"
+            // where type is B (primary+sub), P (primary) or S (sub). Record the
+            // fingerprint so generated keys are discoverable just like imports.
+            let parts = value.split(separator: " ").map(String.init)
+            if parts.count >= 2 {
+                fingerprints.append(parts[1])
+            }
+            generated += 1
+            status = "key generated"
         } else if key == "KEYEXPIRED" {
             results.append(["fingerprint": NSNull(), "problem": "0", "text": "Key expired"])
         } else if key == "SIGEXPIRED" {
@@ -150,6 +166,6 @@ public final class ImportResult: BaseStatusHandler, @unchecked Sendable {
         if let status = status, status.contains("error") || status.contains("failure") {
             return false
         }
-        return imported > 0 && !fingerprints.isEmpty
+        return (imported > 0 || generated > 0) && !fingerprints.isEmpty
     }
 }

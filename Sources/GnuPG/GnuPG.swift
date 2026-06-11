@@ -102,7 +102,25 @@ public final class GnuPG: @unchecked Sendable {
         // Test GPG binary availability and get version
         try initializeGPG()
     }
-    
+
+    /// Internal initializer for unit tests that exercise status-message parsing
+    /// and result construction (e.g. `VerifyResult.handleStatus`).
+    ///
+    /// Unlike the public initializer, this does **not** probe for a `gpg` binary
+    /// or launch any subprocess, so parsing tests run on headless/Linux CI where
+    /// `gpg` may be absent or have no agent. Never invoke gpg operations through
+    /// an instance created this way — `gpgBinary` is not guaranteed to resolve.
+    init(unprobedBinary gpgBinary: String) {
+        self.gpgBinary = gpgBinary
+        self.gnupgHome = nil
+        self.verbose = false
+        self.useAgent = false
+        self.keyring = nil
+        self.secretKeyring = nil
+        self.options = nil
+        self.environment = nil
+    }
+
     // MARK: - Private Methods
     
     /// Find the GPG binary in common locations
@@ -578,20 +596,27 @@ public final class GnuPG: @unchecked Sendable {
         statusHandler: StatusHandler,
         passphrase: String? = nil
     ) async throws -> (output: Data?, exitCode: Int32) {
-        
-        let process = try openSubprocess(arguments, hasPassphrase: passphrase != nil)
-        
-        guard let stdinPipe = process.standardInput as? Pipe else {
-            throw GPGError.unknownError("Failed to get stdin pipe")
-        }
-        
-        let stdinHandle = stdinPipe.fileHandleForWriting
-        
-        // Write passphrase if provided
+
+        // Validate the passphrase *before* launching gpg. Otherwise an invalid
+        // passphrase throws after the subprocess is already running with
+        // `--passphrase-fd 0`, leaving a gpg process blocked on stdin that holds
+        // a keyring lock and corrupts later operations in the same home.
         if let passphrase = passphrase {
             guard GPGUtilities.isValidPassphrase(passphrase) else {
                 throw GPGError.invalidPassphrase("contains newline or null characters")
             }
+        }
+
+        let process = try openSubprocess(arguments, hasPassphrase: passphrase != nil)
+
+        guard let stdinPipe = process.standardInput as? Pipe else {
+            throw GPGError.unknownError("Failed to get stdin pipe")
+        }
+
+        let stdinHandle = stdinPipe.fileHandleForWriting
+
+        // Write passphrase if provided
+        if let passphrase = passphrase {
             let passphraseData = "\(passphrase)\n".data(using: encoding)!
             if #available(macOS 10.15.4, *) {
                 try stdinHandle.write(contentsOf: passphraseData)
@@ -599,7 +624,7 @@ public final class GnuPG: @unchecked Sendable {
                 stdinHandle.write(passphraseData)
             }
         }
-        
+
         // Write input data if provided
         if let inputData = input {
             if #available(macOS 10.15.4, *) {
@@ -634,20 +659,26 @@ public final class GnuPG: @unchecked Sendable {
         statusHandler: StatusHandler,
         passphrase: String? = nil
     ) async throws -> (output: Data?, exitCode: Int32) {
-        
-        let process = try openSubprocess(arguments, hasPassphrase: passphrase != nil)
-        
-        guard let stdinPipe = process.standardInput as? Pipe else {
-            throw GPGError.unknownError("Failed to get stdin pipe")
-        }
-        
-        let stdinHandle = stdinPipe.fileHandleForWriting
-        
-        // Write passphrase if provided
+
+        // Validate the passphrase before launching gpg (see note in the other
+        // executeCommand overload) so an invalid passphrase never leaves a gpg
+        // process blocked on stdin holding a keyring lock.
         if let passphrase = passphrase {
             guard GPGUtilities.isValidPassphrase(passphrase) else {
                 throw GPGError.invalidPassphrase("contains newline or null characters")
             }
+        }
+
+        let process = try openSubprocess(arguments, hasPassphrase: passphrase != nil)
+
+        guard let stdinPipe = process.standardInput as? Pipe else {
+            throw GPGError.unknownError("Failed to get stdin pipe")
+        }
+
+        let stdinHandle = stdinPipe.fileHandleForWriting
+
+        // Write passphrase if provided
+        if let passphrase = passphrase {
             let passphraseData = "\(passphrase)\n".data(using: encoding)!
             if #available(macOS 10.15.4, *) {
                 try stdinHandle.write(contentsOf: passphraseData)
@@ -655,7 +686,7 @@ public final class GnuPG: @unchecked Sendable {
                 stdinHandle.write(passphraseData)
             }
         }
-        
+
         // Close stdin to signal end of input (for file operations, GPG handles file input)
         if #available(macOS 10.15, *) {
             try? stdinHandle.close()
