@@ -22,71 +22,82 @@ extension GnuPG {
                          expire: Int = 0) async -> ImportResult {
         
         let result = ImportResult(gpg: self)
-        
+
         do {
-            // Build key generation parameters
-            var keySpec = ""
-            
-            // Key type based on algorithm and usage
-            let keyType: String
-            switch (algorithm.lowercased(), usage.lowercased()) {
-            case ("rsa", "sign"):
-                keyType = "4"  // RSA (sign only)
-            case ("rsa", "encrypt"):
-                keyType = "6"  // RSA (encrypt only)
-            case ("dsa", "sign"):
-                keyType = "17" // DSA (sign only)
-            case ("ecdsa", "sign"):
-                keyType = "22" // ECDSA (sign only)
-            default:
-                keyType = "4"  // Default to RSA sign
-            }
-            
-            keySpec += "Key-Type: \(keyType)\n"
-            
-            // Key length
-            if let size = keySize {
-                keySpec += "Key-Length: \(size)\n"
-            }
-            
-            // Subkey usage
-            keySpec += "Key-Usage: \(usage)\n"
-            
-            // Expiration
-            if expire > 0 {
-                keySpec += "Expire-Date: \(expire)d\n"
-            } else {
-                keySpec += "Expire-Date: 0\n"
-            }
-            
-            // Master key
-            keySpec += "Master-Key: \(masterKey)\n"
-            
-            // Passphrase
-            keySpec += "Passphrase: \(masterPassphrase)\n"
-            
-            // End marker
-            keySpec += "%commit\n%echo done\n"
-            
-            let args = ["--batch", "--gen-key"]
-            
-            let processResult = try await self.executeCommand(
+            // Use --quick-add-key (matching python-gnupg). This emits a
+            // KEY_CREATED status line carrying the *subkey* fingerprint, which
+            // ImportResult records, and reports an invalid algorithm with a
+            // non-zero exit code rather than silently falling back to RSA.
+            let expireSpec = expire > 0 ? "\(expire)d" : "0"
+            let args = ["--quick-add-key", masterKey, algorithm, usage, expireSpec]
+
+            _ = try await self.executeCommand(
                 arguments: args,
-                input: keySpec.data(using: .utf8),
+                input: Data(),
                 statusHandler: result,
                 passphrase: masterPassphrase
             )
-            
-            // Parse the output for the new subkey fingerprint
-            if let output = processResult.output,
-               let outputString = String(data: output, encoding: .utf8) {
-                result.status = outputString
-            }
-            
+
         } catch {
             result.status = "error: \(error.localizedDescription)"
         }
-        
+
+        return result
+    }
+
+    /// Delete a single subkey from a key, leaving the primary key intact.
+    ///
+    /// `--delete-keys`/`--delete-secret-keys` always remove the whole key, so a
+    /// subkey is deleted via the `--edit-key` `delkey` command instead. A single
+    /// edit removes the subkey from both the public and secret keyrings.
+    /// - Parameters:
+    ///   - masterFingerprint: Fingerprint (or key id) of the primary key.
+    ///   - subkeyFingerprint: Fingerprint of the subkey to remove.
+    ///   - passphrase: Passphrase for the key, if protected.
+    /// - Returns: A GPGResult indicating success or failure.
+    @discardableResult
+    public func deleteSubkey(masterFingerprint: String,
+                             subkeyFingerprint: String,
+                             passphrase: String? = nil) async -> GPGResult {
+        let result = GPGResult(gpg: self)
+
+        // Locate the 1-based index of the subkey among the primary's subkeys;
+        // `key N` in --edit-key selects subkeys in this same listing order.
+        let listing = await listKeys(keys: [masterFingerprint])
+        guard let master = listing.keys.first(where: { key in
+            key.fingerprint == masterFingerprint
+                || key.fingerprint?.hasSuffix(masterFingerprint) == true
+                || masterFingerprint.hasSuffix(key.keyId)
+        }) else {
+            result.status = "error: master key not found"
+            result.returnCode = 2
+            return result
+        }
+
+        guard let position = master.subkeys.firstIndex(where: { subkey in
+            let fpr = subkey.2
+            return fpr == subkeyFingerprint
+                || fpr.hasSuffix(subkeyFingerprint)
+                || subkeyFingerprint.hasSuffix(subkey.0)
+        }) else {
+            result.status = "error: subkey not found"
+            result.returnCode = 2
+            return result
+        }
+
+        // key <n> selects the subkey, delkey removes it, y confirms, save commits.
+        let commands = "key \(position + 1)\ndelkey\ny\nsave\n"
+        do {
+            _ = try await self.executeCommand(
+                arguments: ["--command-fd", "0", "--edit-key", masterFingerprint],
+                input: commands.data(using: .utf8),
+                statusHandler: result,
+                passphrase: passphrase
+            )
+        } catch {
+            result.status = "error: \(error.localizedDescription)"
+        }
+
         return result
     }
 }

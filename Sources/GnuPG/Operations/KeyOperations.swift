@@ -34,7 +34,9 @@ extension GnuPG {
                 args = useSecretKeys ? ["--list-secret-keys"] : ["--list-public-keys"]
             }
             
-            args.append(contentsOf: ["--with-colons", "--with-fingerprint"])
+            // --with-keygrip emits `grp:` records so keygrips (primary + subkeys)
+            // can be parsed. Available in GnuPG 2.1+.
+            args.append(contentsOf: ["--with-colons", "--with-fingerprint", "--with-keygrip"])
             
             // Add extra arguments if provided
             if let extraArgs = extraArgs {

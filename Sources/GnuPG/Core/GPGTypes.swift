@@ -83,6 +83,22 @@ public enum GPGTrust: String, CaseIterable, Equatable, Sendable {
         // Return closest match or unknown
         return GPGTrust(from: value)
     }
+
+    /// The numeric ownertrust value understood by `gpg --import-ownertrust`,
+    /// or `nil` for levels that can't be assigned as ownertrust (unknown,
+    /// revoked, disabled). These mirror python-gnupg's `TRUST_LEVELS` + 1.
+    public var ownertrustImportValue: Int? {
+        switch self {
+        case .expired:   return 1
+        case .undefined: return 2
+        case .never:     return 3
+        case .marginal:  return 4
+        case .fully:     return 5
+        case .ultimate:  return 6
+        case .unknown, .revoked, .disabled:
+            return nil
+        }
+    }
 }
 
 // MARK: - GPG Errors

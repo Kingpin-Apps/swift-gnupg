@@ -12,30 +12,40 @@ extension GnuPG {
     @discardableResult
     public func trustKeys(_ fingerprints: [String], trustLevel: GPGTrust) async -> GPGResult {
         let result = GPGResult(gpg: self)
-        
+
+        // Only certain levels are assignable as ownertrust; reject the rest
+        // (unknown/revoked/disabled, e.g. from an invalid GPGTrust.custom(...)).
+        guard let trustValue = trustLevel.ownertrustImportValue else {
+            result.status = "error: invalid trust level"
+            result.returnCode = 2
+            return result
+        }
+
+        // Apply trust via `--import-ownertrust` rather than the interactive
+        // `--edit-key trust` menu, which is unreliable in batch mode (it leaves
+        // ownertrust unset). The input format is `<fingerprint>:<value>:` per line.
+        let ownertrustInput = fingerprints
+            .map { "\($0):\(trustValue):" }
+            .joined(separator: "\n") + "\n"
+
         do {
-            for fingerprint in fingerprints {
-                // Use --edit-key to set trust
-                let trustCommand = "\(trustLevel.rawValue)\ny\nquit\n"
-                
-                let args = ["--batch", "--yes", "--command-fd", "0", "--edit-key", fingerprint, "trust"]
-                
-                _ = try await self.executeCommand(
-                    arguments: args,
-                    input: trustCommand.data(using: .utf8),
-                    statusHandler: result
-                )
-                
-                // Check if the operation succeeded
-                if result.returnCode != 0 {
-                    result.status = "Failed to set trust for key: \(fingerprint)"
-                    break
-                }
+            // Force the pgp trust model for this call. Callers (e.g. test setups)
+            // may run with a global "--trust-model always", under which gpg never
+            // creates a trustdb; --import-ownertrust then fails fatally because the
+            // trustdb file doesn't exist. "--trust-model pgp" comes last, so it wins.
+            _ = try await self.executeCommand(
+                arguments: ["--trust-model", "pgp", "--import-ownertrust"],
+                input: ownertrustInput.data(using: .utf8),
+                statusHandler: result
+            )
+
+            if result.returnCode != 0 {
+                result.status = "Failed to set trust"
             }
         } catch {
             result.status = "error: \(error.localizedDescription)"
         }
-        
+
         return result
     }
     
@@ -99,13 +109,26 @@ public class GPGResult: BaseStatusHandler, @unchecked Sendable {
         super.init(gpg: gpg)
     }
     
+    /// Human-readable reasons for the DELETE_PROBLEM status code.
+    private static let deleteProblemReasons: [String: String] = [
+        "1": "No such key",
+        "2": "Must delete secret key first",
+        "3": "Ambiguous specification"
+    ]
+
     public override func handleStatus(key: String, value: String) {
-        let statusMessage = "\(key): \(value)"
-        
+        let statusMessage: String
+        if key == "DELETE_PROBLEM" {
+            statusMessage = GPGResult.deleteProblemReasons[value] ?? "Delete problem: \(value)"
+            self.returnCode = 2
+        } else {
+            statusMessage = "\(key): \(value)"
+        }
+
         if key.contains("ERROR") || key.contains("FAILURE") {
             self.returnCode = 2
         }
-        
+
         if self.status == nil {
             self.status = statusMessage
         } else {

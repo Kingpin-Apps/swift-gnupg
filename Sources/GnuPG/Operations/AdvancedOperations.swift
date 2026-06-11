@@ -114,11 +114,10 @@ extension GnuPG {
                 statusHandler: result
             )
             
-            // Parse the output
+            // Parse the keyserver search results (a distinct colon format).
             if let outputData = processResult.output,
-               let _ = String(data: outputData, encoding: .utf8) {
-                // Parse search results (simplified parsing)
-                result.status = "search completed"
+               let outputString = String(data: outputData, encoding: .utf8) {
+                result.parseSearchOutput(outputString)
             }
             
         } catch {
