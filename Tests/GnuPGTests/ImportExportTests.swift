@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Corresponds to Python tests:
 /// - test_import_and_export, test_import_only, test_doctest_import_keys, test_scan_keys, test_scan_keys_mem
-@Suite("Key Import/Export Tests", .serialized)
+@Suite("Key Import/Export Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct ImportExportTests {
     
     // MARK: - Import Tests

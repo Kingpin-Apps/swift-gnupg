@@ -9,7 +9,7 @@ import Foundation
 /// - test_key_generation_with_escapes, test_key_generation_failure, test_key_generation_input,
 /// - test_add_subkey, test_add_subkey_with_invalid_key_type, test_deletion_subkey,
 /// - test_list_subkey_after_generation, test_list_keys_after_generation
-@Suite("Key Generation Tests", .serialized)
+@Suite("Key Generation Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct KeyGenerationTests {
     
     // MARK: - Basic Key Generation
@@ -156,7 +156,7 @@ struct KeyGenerationTests {
             #expect(uids.count == 1, "Should have one user ID")
             
             if uids.count > 0 {
-                let expectedUid = "Test Name (Funny chars: \\r\\n\\u{0C}\\u{0B}\\0\\u{08}) <test.name@example.com>"
+                let expectedUid = "Test Name (Funny chars: \r\n\u{0C}\u{0B}\u{0}\u{08}) <test.name@example.com>"
                 #expect(uids[0] == expectedUid, "User ID should handle escape characters correctly")
             }
         }
@@ -372,7 +372,7 @@ struct KeyGenerationTests {
         
         #expect(result.data == nil || result.data?.isEmpty == true, "Invalid subkey type should produce no data")
         #expect(result.fingerprint.isEmpty, "Invalid subkey type should produce no fingerprint")  
-        #expect(result.returnCode == 1, "Invalid subkey type should return exit code 1")
+        #expect(result.returnCode != 0, "Invalid subkey type should fail with a non-zero exit code")
     }
     
     @Test("Test subkey deletion")
@@ -433,19 +433,15 @@ struct KeyGenerationTests {
         #expect(TestHelpers.isListWithLength(privateKeys.keys, 1), "Should have 1 private key")
         #expect(secretKeyInfo.subkeys.count == 1, "Should have 1 secret subkey")
         
-        // Delete the subkey
-        let _ = await gpg.deleteKeys(
-            subkey.fingerprint,
-            secret: true,
+        // Delete only the subkey (a single edit removes it from both the public
+        // and secret keyrings while leaving the primary key intact).
+        let deleteSubkeyResult = await gpg.deleteSubkey(
+            masterFingerprint: masterKey.fingerprint,
+            subkeyFingerprint: subkey.fingerprint,
             passphrase: "123"
         )
-        
-        let deletePublicResult = await gpg.deleteKeys(
-            subkey.fingerprint,
-            secret: false
-        )
-        
-        #expect(deletePublicResult.returnCode == 0, "Public subkey deletion should succeed")
+
+        #expect(deleteSubkeyResult.returnCode == 0, "Subkey deletion should succeed")
         
         // Verify subkey was deleted
         let publicKeysAfter = await gpg.listKeys()

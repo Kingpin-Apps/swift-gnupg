@@ -8,8 +8,12 @@ struct EncryptDecryptTests {
     
     // MARK: - Test Setup
     
+    // Parsing tests only build result objects and feed them canned status
+    // messages, so a stub (no gpg process) is sufficient and runs anywhere.
+    // Integration tests in this suite are gated on `realGPGAvailable` and only
+    // run when a real gpg is usable, in which case they get a live instance.
     private func createTestGPG() -> GnuPG? {
-        return try? GnuPG()
+        TestHelpers.realGPGAvailable ? (try? GnuPG()) : TestHelpers.makeParsingStub()
     }
     
     // MARK: - EncryptResult Tests
@@ -283,7 +287,7 @@ struct EncryptDecryptTests {
     // MARK: - Encrypt Operations Tests
     // Note: These tests would require actual GPG setup in a real test environment
     
-    @Test("Encrypt message with recipients")
+    @Test("Encrypt message with recipients", .enabled(if: TestHelpers.realGPGAvailable))
     func testEncryptMessage() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -300,7 +304,7 @@ struct EncryptDecryptTests {
         #expect(result.status != nil) // Should have some status (error in this case since no GPG)
     }
     
-    @Test("Encrypt with no recipients returns error")
+    @Test("Encrypt with no recipients returns error", .enabled(if: TestHelpers.realGPGAvailable))
     func testEncryptWithNoRecipients() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -316,7 +320,7 @@ struct EncryptDecryptTests {
         #expect(!result.isSuccessful)
     }
     
-    @Test("Encrypt symmetric")
+    @Test("Encrypt symmetric", .enabled(if: TestHelpers.realGPGAvailable))
     func testEncryptSymmetric() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -331,7 +335,7 @@ struct EncryptDecryptTests {
         #expect(result.status != nil)
     }
     
-    @Test("Encrypt file with recipients")
+    @Test("Encrypt file with recipients", .enabled(if: TestHelpers.realGPGAvailable))
     func testEncryptFile() async throws {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -350,12 +354,12 @@ struct EncryptDecryptTests {
         
         let recipients = ["test@example.com"]
         let result = await gpg.encryptFile(inputPath: testFile.path, recipients: recipients)
-        
+
         #expect(result.status != nil)
-        #expect(!result.status!.contains("input file not found"))
+        #expect(result.status?.contains("input file not found") != true)
     }
     
-    @Test("Encrypt non-existent file returns error")
+    @Test("Encrypt non-existent file returns error", .enabled(if: TestHelpers.realGPGAvailable))
     func testEncryptNonExistentFile() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -371,7 +375,7 @@ struct EncryptDecryptTests {
     
     // MARK: - Decrypt Operations Tests
     
-    @Test("Decrypt message")
+    @Test("Decrypt message", .enabled(if: TestHelpers.realGPGAvailable))
     func testDecryptMessage() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -385,7 +389,7 @@ struct EncryptDecryptTests {
         #expect(result.status != nil)
     }
     
-    @Test("Decrypt file")
+    @Test("Decrypt file", .enabled(if: TestHelpers.realGPGAvailable))
     func testDecryptFile() async throws {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -403,12 +407,12 @@ struct EncryptDecryptTests {
         }
         
         let result = await gpg.decryptFile(inputPath: testFile.path)
-        
+
         #expect(result.status != nil)
-        #expect(!result.status!.contains("input file not found"))
+        #expect(result.status?.contains("input file not found") != true)
     }
     
-    @Test("Decrypt non-existent file returns error")
+    @Test("Decrypt non-existent file returns error", .enabled(if: TestHelpers.realGPGAvailable))
     func testDecryptNonExistentFile() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -421,7 +425,7 @@ struct EncryptDecryptTests {
         #expect(!result.isSuccessful)
     }
     
-    @Test("Decrypt and verify")
+    @Test("Decrypt and verify", .enabled(if: TestHelpers.realGPGAvailable))
     func testDecryptAndVerify() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -437,7 +441,7 @@ struct EncryptDecryptTests {
     
     // MARK: - Convenience Methods Tests
     
-    @Test("Can decrypt check")
+    @Test("Can decrypt check", .enabled(if: TestHelpers.realGPGAvailable))
     func testCanDecrypt() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -451,7 +455,7 @@ struct EncryptDecryptTests {
         #expect(!canDecrypt)
     }
     
-    @Test("Can decrypt file check")
+    @Test("Can decrypt file check", .enabled(if: TestHelpers.realGPGAvailable))
     func testCanDecryptFile() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -470,7 +474,7 @@ struct EncryptDecryptTests {
 /// Corresponds to Python tests:
 /// - test_encryption_and_decryption, test_file_encryption_and_decryption,
 /// - test_invalid_outputs, test_filenames_with_spaces, test_no_such_key
-@Suite("Ported Encryption/Decryption Tests", .serialized)
+@Suite("Ported Encryption/Decryption Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct PortedEncryptDecryptTests {
     
     // MARK: - Basic Encryption/Decryption
@@ -918,7 +922,7 @@ struct PortedEncryptDecryptTests {
         let mode = FileManager.default.fileExists(atPath: encFileName) ?
         try FileManager.default.attributesOfItem(atPath: encFileName)[.posixPermissions] as? NSNumber : nil
         if let mode = mode {
-            let newMode = mode.uint16Value | FilePermissions.ownerExecute.rawValue
+            let newMode = UInt32(mode.uint16Value) | UInt32(FilePermissions.ownerExecute.rawValue)
             try FileManager.default.setAttributes([.posixPermissions: newMode], ofItemAtPath: encFileName)
             try FileManager.default.setAttributes([.posixPermissions: newMode], ofItemAtPath: decFileName)
         }

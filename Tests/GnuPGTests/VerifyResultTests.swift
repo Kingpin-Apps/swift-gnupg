@@ -8,9 +8,10 @@ struct VerifyResultTests {
     // MARK: - Mock GPG for testing
     
     private func createMockGPG() throws -> GnuPG {
-        // Create a GPG instance for testing VerifyResult
-        // Use the actual GPG binary since these are just testing result parsing
-        return try GnuPG(gpgBinary: "/opt/homebrew/bin/gpg")
+        // These tests only feed canned status messages to VerifyResult, so use a
+        // parsing stub that launches no gpg process. This lets them run anywhere,
+        // including headless Linux CI with no gpg binary or agent.
+        return TestHelpers.makeParsingStub()
     }
     
     // MARK: - VerifyResult Tests

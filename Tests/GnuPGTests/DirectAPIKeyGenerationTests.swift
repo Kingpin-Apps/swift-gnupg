@@ -3,7 +3,7 @@ import Testing
 @testable import GnuPG
 
 /// Tests for key generation functionality
-@Suite("Direct API Key Generation Tests", .serialized)
+@Suite("Direct API Key Generation Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct DirectAPIKeyGenerationTests {
     
     /// Test basic key generation
@@ -37,7 +37,7 @@ struct DirectAPIKeyGenerationTests {
             return  // Test passes with imported keys
         }
         
-        #expect(result.imported == 1)
+        #expect(result.generated == 1)
         #expect(!result.fingerprints.isEmpty)
         
         // Verify the key exists
@@ -85,7 +85,7 @@ struct DirectAPIKeyGenerationTests {
             return  // Test passes with imported keys
         }
         
-        #expect(result.imported == 1)
+        #expect(result.generated == 1)
         #expect(!result.fingerprints.isEmpty)
         
         // Verify the key was created

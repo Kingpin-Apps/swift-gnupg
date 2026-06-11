@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Corresponds to Python tests:
 /// - test_key_trust, test_list_signatures, test_deletion
-@Suite("Key Management Tests", .serialized)
+@Suite("Key Management Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct KeyManagementTests {
     
     // MARK: - Trust Management Tests

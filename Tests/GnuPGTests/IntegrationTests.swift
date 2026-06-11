@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import GnuPG
 
-@Suite("Integration Tests", .serialized)
+@Suite("Integration Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct IntegrationTests {
     
     // MARK: - Test Setup

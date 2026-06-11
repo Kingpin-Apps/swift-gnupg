@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import GnuPG
 
-@Suite("Key Operations Tests", .serialized)
+@Suite("Key Operations Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct KeyOperationsTests {
     
     // MARK: - Test Setup
@@ -129,10 +129,10 @@ struct KeyOperationsTests {
         
         // Sample GPG colon output format
         let colonOutput = """
-        pub:u:3072:1:1234567890ABCDEF:1696118400:0:::u:::SC:::+:::0:
+        pub:u:3072:1:1234567890ABCDEF:1696118400:::u:::SC::::::23::0:
         fpr:::::::::ABCDEF1234567890FEDCBA0987654321ABCDEF12:
         uid:u::::1696118400::ABCDEF1234567890FEDCBA0987654321ABCDEF12::Test User <test@example.com>::::::::::0:
-        sub:u:3072:1:FEDCBA0987654321:1696118400:0:::::E:::+:::0:
+        sub:u:3072:1:FEDCBA0987654321:1696118400::::::E::::::23:
         fpr:::::::::FEDCBA0987654321ABCDEF1234567890ABCDEF12:
         """
         

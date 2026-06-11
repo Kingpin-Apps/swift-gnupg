@@ -7,8 +7,12 @@ struct VerifyOperationsTests {
     
     // MARK: - Test Setup
     
+    // Parsing tests only build result objects and feed them canned status
+    // messages, so a stub (no gpg process) is sufficient and runs anywhere.
+    // Integration tests in this suite are gated on `realGPGAvailable` and only
+    // run when a real gpg is usable, in which case they get a live instance.
     private func createTestGPG() -> GnuPG? {
-        return try? GnuPG()
+        TestHelpers.realGPGAvailable ? (try? GnuPG()) : TestHelpers.makeParsingStub()
     }
     
     // MARK: - VerifyResult Tests
@@ -193,7 +197,7 @@ struct VerifyOperationsTests {
     // MARK: - Verify Operations Tests
     // Note: These tests would require actual GPG setup in a real test environment
     
-    @Test("Verify inline signature")
+    @Test("Verify inline signature", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyInlineSignature() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -208,7 +212,7 @@ struct VerifyOperationsTests {
         #expect(result.status != nil) // Should have some status (error in this case since no GPG)
     }
     
-    @Test("Verify detached signature")
+    @Test("Verify detached signature", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyDetachedSignature() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -224,7 +228,7 @@ struct VerifyOperationsTests {
         #expect(!result.valid) // Should be invalid with fake data
     }
     
-    @Test("Verify file with detached signature")
+    @Test("Verify file with detached signature", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyFileDetached() async throws {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -253,7 +257,7 @@ struct VerifyOperationsTests {
         #expect(!result.valid) // Should be invalid with fake signature
     }
     
-    @Test("Verify file inline signature")
+    @Test("Verify file inline signature", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyFileInline() async throws {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -276,7 +280,7 @@ struct VerifyOperationsTests {
         #expect(result.status != nil)
     }
     
-    @Test("Verify non-existent file returns error")
+    @Test("Verify non-existent file returns error", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyNonExistentFile() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -289,7 +293,7 @@ struct VerifyOperationsTests {
         #expect(!result.valid)
     }
     
-    @Test("Verify cleartext signature")
+    @Test("Verify cleartext signature", .enabled(if: TestHelpers.realGPGAvailable))
     func testVerifyCleartext() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -312,7 +316,7 @@ struct VerifyOperationsTests {
         #expect(result.status != nil)
     }
     
-    @Test("Convenience method - isSignatureValid")
+    @Test("Convenience method - isSignatureValid", .enabled(if: TestHelpers.realGPGAvailable))
     func testIsSignatureValid() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -326,7 +330,7 @@ struct VerifyOperationsTests {
         #expect(!isValid)
     }
     
-    @Test("Convenience method - isFileSignatureValid")
+    @Test("Convenience method - isFileSignatureValid", .enabled(if: TestHelpers.realGPGAvailable))
     func testIsFileSignatureValid() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -339,7 +343,7 @@ struct VerifyOperationsTests {
         #expect(!isValid)
     }
     
-    @Test("Error handling - invalid message encoding")
+    @Test("Error handling - invalid message encoding", .enabled(if: TestHelpers.realGPGAvailable))
     func testErrorHandlingInvalidEncoding() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")

@@ -7,7 +7,7 @@ import Foundation
 /// Corresponds to Python tests:
 /// - test_signature_verification, test_signature_file, test_subkey_signature_file,
 /// - test_multiple_signatures, test_multiple_signatures_one_invalid
-@Suite("Signature/Verification Tests", .serialized)
+@Suite("Signature/Verification Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct SignatureTests {
     
     // MARK: - Basic Signature Tests
@@ -116,22 +116,26 @@ struct SignatureTests {
             #expect(!hashAlgo.isEmpty, "Detached signature should have hash algorithm")
         }
         
-        // Test detached signature verification
+        // Test detached signature verification. A detached signature can only be
+        // verified against the original data, so it must be supplied here (the
+        // python-gnupg original passes the data file to verify_file).
         guard let detachedSigData = detachedSig.data else {
             Issue.record("Detached signature should have data")
             return
         }
-        
-        let detachedVerified = await gpg.verify(data: detachedSigData)
+
+        let fileContents = try Data(contentsOf: URL(fileURLWithPath: testFilePath))
+        let detachedVerified = await gpg.verify(data: fileContents, signature: detachedSigData)
         #expect(detachedVerified.returnCode == 0, "Detached verification should succeed")
         #expect(detachedVerified.fingerprint == key.fingerprint, "Detached verification fingerprints should match")
-        
+
         // Test in-memory detached verification
         let testData = try Data(contentsOf: URL(fileURLWithPath: testFilePath))
-        // For detached signature, we need to verify using file paths or use the data directly
+        // For detached signatures, `data` is the signed content and `signature`
+        // is the detached signature.
         let memoryVerified = await gpg.verify(
-            data: detachedSigData,
-            signature: testData
+            data: testData,
+            signature: detachedSigData
         )
         #expect(memoryVerified.returnCode == 0, "In-memory verification should succeed")
         #expect(memoryVerified.fingerprint == key.fingerprint, "In-memory verification fingerprints should match")

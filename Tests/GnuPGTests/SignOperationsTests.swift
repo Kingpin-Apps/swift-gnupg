@@ -7,14 +7,16 @@ struct SignOperationsTests {
     
     // MARK: - Test Setup
     
+    // Parsing tests only build result objects and feed them canned status
+    // messages, so a stub (no gpg process) is sufficient and runs anywhere.
+    // Integration tests in this suite are gated on `realGPGAvailable` and only
+    // run when a real gpg is usable, in which case they get a live instance.
     private func createTestGPG() -> GnuPG? {
-        return try? GnuPG()
+        TestHelpers.realGPGAvailable ? (try? GnuPG()) : TestHelpers.makeParsingStub()
     }
-    
+
     private func createMockGPGWithValidKey() -> GnuPG? {
-        // In real tests, this would set up a test GPG environment
-        // For now, return a basic instance
-        return try? GnuPG()
+        TestHelpers.realGPGAvailable ? (try? GnuPG()) : TestHelpers.makeParsingStub()
     }
     
     // MARK: - SignResult Tests
@@ -155,7 +157,7 @@ struct SignOperationsTests {
     // MARK: - Sign Operations Tests
     // Note: These tests would require actual GPG setup in a real test environment
     
-    @Test("Sign message with basic parameters")
+    @Test("Sign message with basic parameters", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignMessage() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -174,7 +176,7 @@ struct SignOperationsTests {
         #expect(result.status != nil) // Should have some status (error in this case since no GPG)
     }
     
-    @Test("Sign data with binary option")
+    @Test("Sign data with binary option", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignDataBinary() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -188,7 +190,7 @@ struct SignOperationsTests {
         #expect(result.status != nil)
     }
     
-    @Test("Sign with clearsign option")
+    @Test("Sign with clearsign option", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignClearsign() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -201,7 +203,7 @@ struct SignOperationsTests {
         #expect(result.status != nil)
     }
     
-    @Test("Sign file operation")
+    @Test("Sign file operation", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignFile() async throws {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -222,10 +224,10 @@ struct SignOperationsTests {
         
         // Should detect the file exists, even if GPG operation fails
         #expect(result.status != nil)
-        #expect(!result.status!.contains("input file not found"))
+        #expect(result.status?.contains("input file not found") != true)
     }
     
-    @Test("Sign non-existent file returns error")
+    @Test("Sign non-existent file returns error", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignNonExistentFile() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -238,7 +240,7 @@ struct SignOperationsTests {
         #expect(!result.isSuccessful)
     }
     
-    @Test("Sign with specific key ID")
+    @Test("Sign with specific key ID", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignWithKeyId() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")
@@ -252,7 +254,7 @@ struct SignOperationsTests {
         #expect(result.status != nil)
     }
     
-    @Test("Sign with passphrase")
+    @Test("Sign with passphrase", .enabled(if: TestHelpers.realGPGAvailable))
     func testSignWithPassphrase() async {
         guard let gpg = createTestGPG() else {
             Issue.record("Failed to create GPG instance - GPG not available")

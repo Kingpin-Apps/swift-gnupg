@@ -7,7 +7,7 @@ import Foundation
 /// Corresponds to Python tests:
 /// - test_get_recipients, test_passing_paths, test_search_keys, test_invalid_fileobject,
 /// - test_auto_key_locating, test_passphrase_encoding, test_configured_group, test_exception_propagation
-@Suite("Advanced/Edge Case Tests", .serialized)
+@Suite("Advanced/Edge Case Tests", .serialized, .enabled(if: TestHelpers.realGPGAvailable))
 struct AdvancedTests {
     
     // MARK: - Recipient Analysis Tests
@@ -66,7 +66,11 @@ struct AdvancedTests {
         
         // Verify at least one recipient matches one of our keys
         if encryptedRecipients.count > 0 {
-            let availableKeyIds = Set(keys.keys.compactMap { $0.keyId.suffix(8) }.map(String.init))
+            // Encryption targets the encryption subkey, so include subkey IDs
+            // (subkeys are nested under their primary, not top-level entries).
+            let availableKeyIds = Set(keys.keys.flatMap { key in
+                [key.keyId] + key.subkeys.map { $0.0 }
+            }.map { String($0.suffix(8)) })
             let foundKeyIds = Set(encryptedRecipients.compactMap { String($0.suffix(8)) })
             let intersection = availableKeyIds.intersection(foundKeyIds)
             
@@ -205,27 +209,38 @@ struct AdvancedTests {
         }
         
         #expect(!emailSearchResult.keys.isEmpty, "Should find keys by email")
-        
-        let foundByEmail = emailSearchResult.keys.first { key in
-            key.userIds.contains("Vinay Sajip <vinay_sajip@hotmail.com>")
+
+        // Some keyservers (e.g. keyserver.ubuntu.com) return only key records and
+        // strip UIDs, so only assert the UID match when UID data is actually
+        // present in the response.
+        if emailSearchResult.keys.contains(where: { !$0.userIds.isEmpty }) {
+            let foundByEmail = emailSearchResult.keys.first { key in
+                key.userIds.contains("Vinay Sajip <vinay_sajip@hotmail.com>")
+            }
+            #expect(foundByEmail != nil, "Should find Vinay Sajip's key by email")
+        } else {
+            print("Keyserver returned no UID data - skipping email UID match assertion")
         }
-        #expect(foundByEmail != nil, "Should find Vinay Sajip's key by email")
-        
+
         // Search by key ID
         let keyIdSearchResult = await gpg.searchKeys("hkp://keyserver.ubuntu.com:80", "92905378")
-        
+
         // Check if search succeeded
         guard keyIdSearchResult.returnCode == 0 else {
             print("Skipping key ID search test - keyserver access failed (dirmngr issues)")
             return
         }
-        
+
         #expect(!keyIdSearchResult.keys.isEmpty, "Should find keys by key ID")
-        
-        let foundById = keyIdSearchResult.keys.first { key in
-            key.userIds.contains("Vinay Sajip <vinay_sajip@hotmail.com>")
+
+        if keyIdSearchResult.keys.contains(where: { !$0.userIds.isEmpty }) {
+            let foundById = keyIdSearchResult.keys.first { key in
+                key.userIds.contains("Vinay Sajip <vinay_sajip@hotmail.com>")
+            }
+            #expect(foundById != nil, "Should find Vinay Sajip's key by key ID")
+        } else {
+            print("Keyserver returned no UID data - skipping key ID UID match assertion")
         }
-        #expect(foundById != nil, "Should find Vinay Sajip's key by key ID")
     }
     
     // MARK: - File Object Validation Tests
