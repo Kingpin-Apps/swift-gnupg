@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(os)
 import os
+#endif
 
 /// Logging levels for GPG operations
 public enum GPGLogLevel: Int, CaseIterable, Comparable, Sendable {
@@ -55,6 +57,7 @@ public struct GPGConsoleLogHandler: GPGLogHandler {
     }
 }
 
+#if canImport(os)
 /// OSLog-based log handler for better integration with Apple's logging system
 @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public struct GPGOSLogHandler: GPGLogHandler {
@@ -82,6 +85,7 @@ public struct GPGOSLogHandler: GPGLogHandler {
         }
     }
 }
+#endif
 
 /// Main logging class for GPG operations
 public final class GPGLogger: @unchecked Sendable {
@@ -128,6 +132,7 @@ public final class GPGLogger: @unchecked Sendable {
         }
     }
     
+    #if canImport(os)
     @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
     public func setOSLogging(enabled: Bool, subsystem: String = "com.gnupg.swift", category: String = "GPG") {
         queue.sync {
@@ -137,6 +142,7 @@ public final class GPGLogger: @unchecked Sendable {
             }
         }
     }
+    #endif
     
     public func log(
         level: GPGLogLevel,
@@ -234,15 +240,15 @@ extension GPGLogger {
     /// Log operation start/end
     public func logOperation<T>(_ operation: String, category: String = "Operation", block: () throws -> T) rethrows -> T {
         info("Starting \(operation)", category: category)
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = Date().timeIntervalSinceReferenceDate
         
         do {
             let result = try block()
-            let duration = CFAbsoluteTimeGetCurrent() - start
+            let duration = Date().timeIntervalSinceReferenceDate - start
             info("Completed \(operation) in \(String(format: "%.3f", duration))s", category: category)
             return result
         } catch {
-            let duration = CFAbsoluteTimeGetCurrent() - start
+            let duration = Date().timeIntervalSinceReferenceDate - start
             self.error("Failed \(operation) after \(String(format: "%.3f", duration))s: \(error)", category: category)
             throw error
         }
@@ -251,15 +257,15 @@ extension GPGLogger {
     /// Log operation start/end (async version)
     public func logOperationAsync<T>(_ operation: String, category: String = "Operation", block: () async throws -> T) async rethrows -> T {
         info("Starting \(operation)", category: category)
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = Date().timeIntervalSinceReferenceDate
         
         do {
             let result = try await block()
-            let duration = CFAbsoluteTimeGetCurrent() - start
+            let duration = Date().timeIntervalSinceReferenceDate - start
             info("Completed \(operation) in \(String(format: "%.3f", duration))s", category: category)
             return result
         } catch {
-            let duration = CFAbsoluteTimeGetCurrent() - start
+            let duration = Date().timeIntervalSinceReferenceDate - start
             self.error("Failed \(operation) after \(String(format: "%.3f", duration))s: \(error)", category: category)
             throw error
         }
