@@ -288,53 +288,57 @@ quiet
     static let realGPGAvailable: Bool = probeRealGPG()
 
     private static func probeRealGPG() -> Bool {
-        do {
-            // Generate a real key in an isolated home using the same setup the
-            // integration tests use. This requires a working gpg-agent (loopback
-            // passphrase), so it returns true only where genuine secret-key crypto
-            // works and false on headless environments — letting the gpg-dependent
-            // tests skip rather than fail there.
-            //
-            // We call gpg.generateKey directly rather than the import-fallback
-            // helper: importing pre-generated *public* keys can succeed without an
-            // agent, which would be a false positive for crypto that needs secret
-            // keys (sign/decrypt/trust).
-            let (gpg, home) = try createTestGPG()
-            defer { try? FileManager.default.removeItem(atPath: home) }
+        // Generate a real key in an isolated home. This requires a working
+        // gpg-agent (loopback passphrase), so it succeeds only where genuine
+        // secret-key crypto works and fails on headless environments — letting
+        // the gpg-dependent tests skip rather than fail there.
+        //
+        // This runs gpg directly and synchronously (no Task/await, no
+        // semaphore). `.enabled(if:)` needs a synchronous Bool and is evaluated
+        // — possibly concurrently — during test discovery; bridging to the async
+        // API here would block Swift's cooperative thread pool waiting on work
+        // that itself needs that pool, deadlocking the parallel runner. A plain
+        // subprocess + waitUntilExit() runs in the OS, not the cooperative pool.
+        guard let home = try? createTempGPGHome() else { return false }
+        defer { try? FileManager.default.removeItem(atPath: home) }
 
-            let result = runBlocking {
-                await gpg.generateKey(
-                    keyType: "RSA",
-                    keySize: 2048,
-                    userId: "SwiftGnuPG Probe <probe@example.com>",
-                    passphrase: "probe",
-                    expirationDate: nil
-                )
-            }
-            return result.isSuccessful
+        let keyParams = """
+        %echo SwiftGnuPG probe
+        Key-Type: RSA
+        Key-Length: 2048
+        Name-Real: SwiftGnuPG Probe
+        Name-Email: probe@example.com
+        Expire-Date: 0
+        Passphrase: probe
+        %commit
+        """
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["gpg", "--homedir", home, "--batch",
+                             "--pinentry-mode", "loopback", "--generate-key"]
+        // Inherit the parent environment (PATH etc.) and point gpg at the
+        // isolated home; replacing the environment outright would drop PATH so
+        // `/usr/bin/env gpg` couldn't find the binary.
+        var environment = ProcessInfo.processInfo.environment
+        environment["GNUPGHOME"] = home
+        process.environment = environment
+
+        let stdin = Pipe()
+        process.standardInput = stdin
+        // Discard output so the subprocess never blocks on a full pipe.
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            stdin.fileHandleForWriting.write(Data(keyParams.utf8))
+            try? stdin.fileHandleForWriting.close()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
         } catch {
             return false
         }
-    }
-
-    /// Runs an async operation to completion from a synchronous context.
-    /// Used only by `probeRealGPG`, which must produce a `Bool` for the
-    /// synchronous `.enabled(if:)` trait. The work runs on a detached task while
-    /// this thread blocks on a semaphore; the gpg subprocess I/O it performs is
-    /// not bound to the calling thread, so there is no deadlock.
-    private static func runBlocking<T: Sendable>(_ operation: @escaping @Sendable () async -> T) -> T {
-        let semaphore = DispatchSemaphore(value: 0)
-        let box = ResultBox<T>()
-        Task.detached {
-            box.value = await operation()
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return box.value!
-    }
-
-    private final class ResultBox<T>: @unchecked Sendable {
-        var value: T?
     }
 
     // MARK: - Key Generation Helpers
@@ -545,14 +549,15 @@ quiet
     /// - Parameter filename: Name of test file to create
     /// - Returns: Path to created test file
     static func createRandomTestFile(filename: String = "random_binary_data") throws -> String {
+        // Use a unique path per call. A fixed shared filename is a cross-test data
+        // race once the suite runs in parallel (and its `.asc`/`.sig` sidecars
+        // collide), so each caller gets its own file to clean up.
         let tempDir = NSTemporaryDirectory()
-        let testFilePath = tempDir + filename
-        
-        if !FileManager.default.fileExists(atPath: testFilePath) {
-            let testData = createRandomTestData(size: 5120 * 1024) // 5MB like Python version
-            try testData.write(to: URL(fileURLWithPath: testFilePath))
-        }
-        
+        let testFilePath = tempDir + "\(filename)-\(UUID().uuidString)"
+
+        let testData = createRandomTestData(size: 5120 * 1024) // 5MB like Python version
+        try testData.write(to: URL(fileURLWithPath: testFilePath))
+
         return testFilePath
     }
 }
