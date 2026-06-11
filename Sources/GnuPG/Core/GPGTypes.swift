@@ -15,7 +15,11 @@ public struct GPGVersion: Sendable {
     }
     
     static func parse(from data: Data) -> GPGVersion? {
-        guard let string = String(data: data, encoding: .ascii),
+        // Decode with Latin-1 (the library's default encoding), not ASCII:
+        // `--list-config` output can contain bytes > 127 (locale-dependent
+        // fields), and `.ascii` fails the whole decode on any such byte, leaving
+        // the version unparsed (observed on Linux). Latin-1 maps every byte.
+        guard let string = String(data: data, encoding: .isoLatin1),
               let range = string.range(of: #"cfg:version:(\d+(?:\.\d+)*)"#, options: .regularExpression) else {
             return nil
         }

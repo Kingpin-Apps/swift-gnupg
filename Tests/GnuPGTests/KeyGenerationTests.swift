@@ -71,7 +71,7 @@ struct KeyGenerationTests {
             nameReal: "urn:uuid:731c22c4-830f-422f-80dc-14a9fdae8c19",
             nameComment: "dummy comment",
             nameEmail: "test.name@example.com",
-            passphrase: gpg.version! >= GPGVersion(
+            passphrase: (gpg.version ?? GPGVersion(major: 2, minor: 1)) >= GPGVersion(
                 major: 2,
                 minor: 1
             ) ? "foo" : nil
@@ -121,7 +121,7 @@ struct KeyGenerationTests {
             nameReal: "Test Name",
             nameComment: "Funny chars: \\r\\n\\f\\v\\0\\b",
             nameEmail: "test.name@example.com",
-            passphrase: gpg.version! >= GPGVersion(
+            passphrase: (gpg.version ?? GPGVersion(major: 2, minor: 1)) >= GPGVersion(
                 major: 2,
                 minor: 1
             ) ? "foo" : nil

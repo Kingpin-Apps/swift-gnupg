@@ -66,6 +66,12 @@ public final class ImportResult: BaseStatusHandler, @unchecked Sendable {
             return
         } else if key == "NODATA" {
             results.append(["fingerprint": NSNull(), "problem": "0", "text": "No valid data found"])
+            // Record a status too: invalid input reliably emits NODATA on every
+            // platform, whereas the FAILURE line that otherwise sets `status` is
+            // not emitted everywhere (e.g. some Linux gpg builds).
+            if status == nil {
+                status = "no valid data found"
+            }
         } else if key == "IMPORT_OK" {
             let parts = value.split(separator: " ").map(String.init)
             if parts.count >= 2 {
